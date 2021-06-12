@@ -2,11 +2,11 @@
 import socketserver
 from pprint import pprint
 from socket import socket
+
 import requests
 
-
-PORT = 9097
-HTTP_ENCODING = 'ISO-8859-1'
+import persistence
+import config
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -19,6 +19,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     """
     data: bytes
     request: socket
+    repository_class = persistence.RequestRepo
 
     def handle(self):
         # self.request is the TCP socket connected to the client
@@ -32,23 +33,28 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         response = requests.request(**request_dict)
 
         # Debug output/persistence
-        with open("./request.txt", "w") as file:
-            file.write(f"{self._request_str}\n\n{response.text}")
+        self.repository_class.save(request_dict, response)
+        self._debug_stdout(response)
 
+        # send back the response
+        self.request.sendall(response.text.encode())
+
+    def _debug_stdout(self, response):
         pprint(response)
-        print("\n"*2)
+        print("\n" * 2)
         print("DEBUG DATA")
-        print("-"*30)
-        print("-"*30)
+        print("-" * 30)
+        print("-" * 30)
         print("\n\nREQUEST:\n")
         print(self._request_str)
         print("\n\nRESPONSE:\n")
         print(response.text)
 
-        # send back the response
-        self.request.sendall(response.text.encode())
-
-    def _parse_request(self) -> dict:
+    def _parse_request(self) -> persistence.RequestDict:
+        """
+        Prepares a dict representation of the request data (kwargs for requests.request)
+        :return:
+        """
         request_lines = self.data.split(b"\r\n")
         method, url, version = request_lines[0].split(b" ")
         # Might use this later
@@ -71,14 +77,13 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
     @property
     def _request_str(self) -> str:
-        return self.data.decode(HTTP_ENCODING)
+        return self.data.decode(config.HTTP_ENCODING)
 
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 9999
-
+    MyTCPHandler.repository_class = persistence.RequestRepo.create(storage_type=persistence.JSON)
     # Create the server, binding to localhost on port 9999
-    with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
+    with socketserver.TCPServer((config.HOST, config.PORT), MyTCPHandler) as server:
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
         server.serve_forever()
