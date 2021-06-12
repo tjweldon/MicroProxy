@@ -1,7 +1,7 @@
 venv/
 .idea/
 request.txt
-data/
-**/!.gitignore
 *.DS_Store
 *__pycache__*
+!*.gitkeep
+data/json/*.json
