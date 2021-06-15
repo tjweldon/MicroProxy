@@ -5,8 +5,9 @@ from socket import socket
 
 import requests
 
-import persistence
+import history
 import config
+import utils
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -19,7 +20,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     """
     data: bytes
     request: socket
-    repository_class = persistence.RequestRepo
+    repository_class = history.RequestRepo
 
     def handle(self):
         # self.request is the TCP socket connected to the client
@@ -50,7 +51,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         print("\n\nRESPONSE:\n")
         print(response.text)
 
-    def _parse_request(self) -> persistence.RequestDict:
+    def _parse_request(self) -> history.RequestDict:
         """
         Prepares a dict representation of the request data (kwargs for requests.request)
         :return:
@@ -58,22 +59,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         request_lines = self.data.split(b"\r\n")
         method, url, version = request_lines[0].split(b" ")
         # Might use this later
-        host = request_lines[1].strip().split(b': ')[-1]
-        payload = b""
-        headers = {}
-        for index, line in [*enumerate(request_lines)][2:]:
-            if len(line) == 0 and method in ["PUT", "POST", "PATCH"]:
-                payload = b"".join(request_lines[index + 1:])
-                break
-            header_item = tuple(line.strip().split(b": "))
-            if len(header_item) != 2:
-                break
-            header_name, value = header_item
-            headers[header_name] = value
-        request_dict = {
-            'method': method, 'url': url, 'headers': headers, 'data': payload
-        }
-        return request_dict
+        return utils.parse_lines(request_lines)
 
     @property
     def _request_str(self) -> str:
@@ -81,7 +67,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
 
 if __name__ == "__main__":
-    MyTCPHandler.repository_class = persistence.RequestRepo.create(storage_type=persistence.JSON)
+    MyTCPHandler.repository_class = history.RequestRepo.create(storage_type=history.JSON)
     # Create the server, binding to localhost on port 9999
     with socketserver.TCPServer((config.HOST, config.PORT), MyTCPHandler) as server:
         # Activate the server; this will keep running until you

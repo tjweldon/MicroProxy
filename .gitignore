@@ -5,3 +5,6 @@ request.txt
 *__pycache__*
 !*.gitkeep
 data/json/*.json
+data/raw/*.http
+templates/template.py
+data/**/!.gitkeep
